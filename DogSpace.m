@@ -34,13 +34,28 @@ classdef DogSpace < ScaleSpace
         end
         
         %%
-        function T=generateExtremaContainer(obj)
-            T = ExtremaContainer();
-            for idx = 1:obj.NumberOfLayers
-                fprintf('generateExtremaContainer: Layer%d\n', idx);
-                new_T = obj.Layers{idx}.getExtrema();
-                T.mergeTables(new_T);
+        function T=generateExtremaContainer(obj, S, r)
+            if nargin < 3
+                r = 10;
             end
+            r
+            T = ExtremaContainer();
+            %             for idx = 1:obj.NumberOfLayers
+            %                 fprintf('generateExtremaContainer: Layer%d\n', idx);
+            %                 new_T = obj.Layers{idx}.getExtrema(r);
+            %                 T.mergeTables(new_T);
+            %             end
+            new_T = cell(obj.NumberOfLayers,1);
+            parfor idx = 1:obj.NumberOfLayers
+                fprintf('generateExtremaContainer: Layer%d\n', idx);
+                new_T{idx} = obj.Layers{idx}.getExtrema(r);
+            end
+            
+            for idx = 1:obj.NumberOfLayers
+                T.concatTables(new_T{idx});
+            end
+            
+            T.getUniqueTable();
         end
     end
 end

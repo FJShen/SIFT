@@ -48,8 +48,11 @@ classdef ScaleLayer  < matlab.mixin.Copyable %< handle %
         %%
         % returns [ExtremaContainer] containing all extremi found in this
         % LAYER
-        function T = getExtrema(obj)
-            T = ExtremaContainer();
+        function T = getExtrema(obj, r)
+            
+            RowLength = obj.Size(1);
+            ColLength = obj.Size(2);
+            T = ExtremaContainer(round(RowLength*ColLength*obj.NumberOfImages/100));
             
             %create a 3_D pixel matrix
             Pixel = [];
@@ -57,88 +60,92 @@ classdef ScaleLayer  < matlab.mixin.Copyable %< handle %
                 Pixel = cat(3, Pixel, obj.Images{idx});
             end
             
-            %create an auxilary matrix marking validity of every pixel, 0
-            %stands for not-inspected, 1 stands for inspected
-            Inspected = zeros(obj.Size(1), obj.Size(2));
-            
             %for each pixel in the middle image, check if it is a
             %maxima/minima
-            for row = 2:obj.Size(1)-1
-                for col = 2:obj.Size(2)-1
-                    if Inspected(row, col)
-                        continue
-                    end
-                    
-                    Inspected(row, col)=1;
-                    value = Pixel(row, col, 2);
-                    checksum = 0;
-                    
-                    UpNeighbor = Pixel(row-1:row+1, col-1:col+1, 1);
-                    DownNeighbor = Pixel(row-1:row+1, col-1:col+1, 3);
-                    SameLevelNeighbor = Pixel(row-1, col-1:col+1, 2);
-                    SameLevelNeighbor = [SameLevelNeighbor Pixel(row, col-1, 2)];
-                    SameLevelNeighbor = [SameLevelNeighbor Pixel(row, col+1, 2)];
-                    SameLevelNeighbor = [SameLevelNeighbor Pixel(row+1, col-1:col+1, 2)];
-                    
-                    % check upper level neighbors
-                    if max(UpNeighbor(:)) < value
-                        checksum = checksum+1;
-                        Inspected(row-1:row+1, col-1:col+1, 1)=ones(3,3,1);
-                    else
-                        if min(UpNeighbor(:)) > value
-                            checksum = checksum-1;
-                            Inspected(row-1:row+1, col-1:col+1, 1)=ones(3,3,1);
-                        else
+            T_local = ExtremaContainer();
+            for image_idx = 2:obj.NumberOfImages-1
+                for row = 2:RowLength-1
+                    for col = 2:ColLength-1
+                        value = Pixel(row, col, image_idx);
+                        if value<0.015 && value>-0.015
                             continue
                         end
-                    end
-                    
-                    % check lower level neighbors
-                    if max(DownNeighbor(:)) < value
-                        checksum = checksum+1;
-                        Inspected(row-1:row+1, col-1:col+1, 3)=ones(3,3,1);
-                    else
-                        if min(DownNeighbor(:)) > value
-                            checksum = checksum-1;
-                            Inspected(row-1:row+1, col-1:col+1, 3)=ones(3,3,1);
+                        
+                        
+                        %check extrema condition
+                        % check upper level neighbors
+                        UpNeighbor = Pixel(row-1:row+1, col-1:col+1, image_idx - 1);
+                        if max(UpNeighbor(:)) < value
+                            checksum = 1;
                         else
+                            if min(UpNeighbor(:)) > value
+                                checksum = -1;
+                            else
+                                continue
+                            end
+                        end
+                        
+                        
+                        % check lower level neighbors
+                        DownNeighbor = Pixel(row-1:row+1, col-1:col+1, image_idx + 1);
+                        if abs(checksum)~=1
                             continue
                         end
-                    end
-                    
-                    % check same-level neighbors
-                    if max(SameLevelNeighbor(:)) < value
-                        checksum = checksum+1;
-                        Inspected(row-1, col-1:col+1, 1)=ones(1,3,1);
-                        Inspected(row+1, col-1:col+1, 1)=ones(1,3,1);
-                        Inspected(row, col-1, 1)=ones(1,1,1);
-                        Inspected(row, col+1, 1)=ones(1,1,1);
-                    else
-                        if min(SameLevelNeighbor(:)) > value
-                            checksum = checksum-1;
-                            Inspected(row-1, col-1:col+1, 1)=ones(1,3,1);
-                            Inspected(row+1, col-1:col+1, 1)=ones(1,3,1);
-                            Inspected(row, col-1, 1)=ones(1,1,1);
-                            Inspected(row, col+1, 1)=ones(1,1,1);
+                        if checksum==1 && max(DownNeighbor(:)) < value
+                            checksum = checksum+1;
                         else
+                            if checksum==-1 && min(DownNeighbor(:)) > value
+                                checksum = checksum-1;
+                            else
+                                continue
+                            end
+                        end
+                        
+                        
+                        % check same-level neighbors
+                        SameLevelNeighbor = Pixel(row-1, col-1:col+1, image_idx);
+                        SameLevelNeighbor = [SameLevelNeighbor Pixel(row, col-1, image_idx)];
+                        SameLevelNeighbor = [SameLevelNeighbor Pixel(row, col+1, image_idx)];
+                        SameLevelNeighbor = [SameLevelNeighbor Pixel(row+1, col-1:col+1, image_idx)];
+                        if abs(checksum)~=2
                             continue
                         end
-                    end
-                    
-                    % final trial
-                    if checksum ~= 3 && checksum ~=-3
-                        continue
-                    end
-                    
-                 
-                    if checksum == 3
-                        T.insertPoint([row, col], obj.Sigmas(2), 1, obj.Size(1)); 
-                    else
-                        T.insertPoint([row, col], obj.Sigmas(2), -1, obj.Size(1));
-                    end
-                    
-                end %for col
-            end %for row
+                        if  checksum==2 && max(SameLevelNeighbor(:)) < value
+                            checksum = checksum+1;
+                        else
+                            if checksum==-2 && min(SameLevelNeighbor(:)) > value
+                                checksum = checksum-1;
+                            else
+                                continue
+                            end
+                        end
+                        
+                        %check if the point satisfies the Hessian
+                        %condition
+                        Hxx = Helper.HessianXX(obj.Images{image_idx}, row, col);
+                        Hyy = Helper.HessianYY(obj.Images{image_idx}, row, col);
+                        Hxy = Helper.HessianXY(obj.Images{image_idx}, row, col);
+                        if (Hxx*Hyy-Hxy^2)/((Hxx+Hyy)^2) < r/((r+1)^2)
+                            continue;
+                        end
+                        
+                        
+                        TrueLoc = Helper.subPixelLocalize(obj.Images{image_idx}, row, col, RowLength, ColLength);
+                        if checksum == 3
+                            T_local.insertPoint([TrueLoc(1), TrueLoc(2)], obj.Sigmas(image_idx), 1, obj.Size(1));
+                        else
+                            if checksum == -3
+                                T_local.insertPoint([TrueLoc(1), TrueLoc(2)], obj.Sigmas(image_idx), -1, obj.Size(1));
+                            else
+                                continue
+                            end
+                        end
+                        
+                    end %for col
+                    T.concatTables(T_local);
+                    T_local.NumberOfPoints = 0;
+                end %for row
+            end %for image_idx
         end %function getExtrema
         
     end

@@ -10,7 +10,10 @@ classdef ExtremaContainer < matlab.mixin.Copyable
     methods
         %%
         function obj = ExtremaContainer(arg)
-            obj.Records = table('Size', [0,5], ...
+            if nargin==0
+                arg = 0;
+            end
+            obj.Records = table('Size', [arg,5], ...
                 'VariableNames', {'XCoordinates', 'YCoordinates','ScaleLevel', 'Polarity', 'ImageRowHeight'}, ...
                 'VariableTypes', {'double', 'double', 'double', 'double', 'double'});
             obj.NumberOfPoints = 0;
@@ -21,10 +24,10 @@ classdef ExtremaContainer < matlab.mixin.Copyable
             obj.NumberOfPoints = obj.NumberOfPoints + 1;
             
             new_cell = {MyCoord(1), MyCoord(2), MyScale, MyPolarity, MyImageRowHeight};
-            obj.Records = [obj.Records; new_cell];
+            obj.Records(obj.NumberOfPoints,:)=new_cell;
            
             % Validity check
-            if min(MyCoord) < 1
+            if min(MyCoord) <= 0
                 warning("Coordinate value is not positive, re-check!")
             end
             
@@ -59,7 +62,7 @@ classdef ExtremaContainer < matlab.mixin.Copyable
         %%
         function concatTables(obj, foreigner)
             assert(isa(foreigner, 'ExtremaContainer'), "Wrong data type!");
-            obj.Records = [obj.Records; foreigner.Records];
+            obj.Records = [obj.Records(1:obj.NumberOfPoints,:); foreigner.Records(1:foreigner.NumberOfPoints,:)];
             obj.NumberOfPoints = obj.NumberOfPoints + foreigner.NumberOfPoints;
         end
         
